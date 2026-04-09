@@ -43,6 +43,7 @@
 #ifndef HSA_RUNTIME_CORE_INC_AMD_BLIT_SDMA_H_
 #define HSA_RUNTIME_CORE_INC_AMD_BLIT_SDMA_H_
 
+#include <atomic>
 #include <mutex>
 #include <stdint.h>
 #include <vector>
@@ -65,6 +66,13 @@ class BlitSdmaBase : public core::Blit {
   static const size_t kMaxSingleCopySize;
   static const size_t kMaxSingleFillSize;
   virtual bool isSDMA() const override { return true; }
+
+  std::atomic<bool> engine_stuck_{false};
+  std::atomic<uint64_t> last_pending_probe_{0};
+  std::atomic<uint32_t> stall_count_{0};
+
+  bool IsStuck() const override { return engine_stuck_.load(std::memory_order_acquire); }
+
   virtual hsa_status_t Initialize(const core::Agent& agent, bool use_xgmi,
                                   size_t linear_copy_size_override, int rec_engine) = 0;
   virtual hsa_status_t SubmitCopyRectCommand(const hsa_pitched_ptr_t* dst,
@@ -147,6 +155,7 @@ class BlitSdma : public BlitSdmaBase {
   virtual hsa_status_t EnableProfiling(bool enable) override;
 
   virtual uint64_t PendingBytes() override;
+  virtual hsa_status_t ResetQueue(const core::Agent& agent) override;
   virtual void GangLeader(bool gang_leader) override { gang_leader_ = gang_leader; }
   virtual bool GangLeader() const override { return gang_leader_; }
 
@@ -227,6 +236,11 @@ class BlitSdma : public BlitSdmaBase {
 
   // Agent object owning the SDMA engine.
   GpuAgent* agent_;
+
+  // Saved init params for ResetQueue re-initialization.
+  bool init_use_xgmi_ = false;
+  size_t init_copy_size_override_ = 0;
+  int init_rec_eng_ = 0;
 
   /// Base address of the Queue buffer at construction time.
   char* queue_start_addr_;

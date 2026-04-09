@@ -45,6 +45,7 @@
 #ifndef HSA_RUNTIME_CORE_INC_AMD_GPU_AGENT_H_
 #define HSA_RUNTIME_CORE_INC_AMD_GPU_AGENT_H_
 
+#include <atomic>
 #include <vector>
 #include <list>
 #include <map>
@@ -442,6 +443,9 @@ class GpuAgent : public GpuAgentInt {
 
   const std::function<void(void*)>& finegrain_deallocator() const { return finegrain_deallocator_; }
 
+  bool IsSdmaD2HStuck() const;
+  hsa_status_t ResetSdmaD2HQueue();
+
  protected:
   // Sizes are in packets.
   static const uint32_t minAqlSize_ = 0x40;     // 4KB min
@@ -763,6 +767,8 @@ class GpuAgent : public GpuAgentInt {
 
   // Check if SDMA engine by ID is free
   bool DmaEngineIsFree(uint32_t engine_id);
+
+  // SDMA health probe — stall tracking now lives on BlitSdmaBase directly.
 
   std::map<uint64_t,unsigned int> gang_peers_info_;
 

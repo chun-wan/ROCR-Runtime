@@ -144,6 +144,9 @@ hsa_status_t BlitSdma<RingIndexTy, HwIndexMonotonic, SizeToCountOffset, useGCR>:
   }
 
   agent_ = reinterpret_cast<AMD::GpuAgent*>(&const_cast<core::Agent&>(agent));
+  init_use_xgmi_ = use_xgmi;
+  init_copy_size_override_ = linear_copy_size_override;
+  init_rec_eng_ = rec_eng;
 
   if (HSA_PROFILE_FULL == agent_->profile()) {
     assert(false && "Only support SDMA for dgpu currently");
@@ -235,6 +238,44 @@ hsa_status_t BlitSdma<RingIndexTy, HwIndexMonotonic, SizeToCountOffset, useGCR>:
 
   signals_[0].reset();
   signals_[1].reset();
+
+  return HSA_STATUS_SUCCESS;
+}
+
+template <typename RingIndexTy, bool HwIndexMonotonic, int SizeToCountOffset, bool useGCR>
+hsa_status_t BlitSdma<RingIndexTy, HwIndexMonotonic, SizeToCountOffset, useGCR>::ResetQueue(
+    const core::Agent& agent) {
+  std::lock_guard<std::mutex> lock(reservation_lock_);
+
+  if (queue_resource_.QueueId != 0) {
+    hsaKmtDestroyQueue(queue_resource_.QueueId);
+    memset(&queue_resource_, 0, sizeof(queue_resource_));
+  }
+
+  if (queue_start_addr_ != NULL) {
+    std::memset(queue_start_addr_, 0, kQueueSize);
+  }
+
+  bytes_queued_ = 0;
+  cached_reserve_index_ = 0;
+  cached_commit_index_ = 0;
+  parity_ = false;
+
+  const HSA_QUEUE_TYPE kQueueType_ = init_rec_eng_ >= 0 ? HSA_QUEUE_SDMA_BY_ENG_ID :
+                                     (init_use_xgmi_ ? HSA_QUEUE_SDMA_XGMI : HSA_QUEUE_SDMA);
+  if (HSAKMT_STATUS_SUCCESS != hsaKmtCreateQueueExt(agent_->node_id(), kQueueType_, 100,
+                                                    HSA_QUEUE_PRIORITY_MAXIMUM, init_rec_eng_,
+                                                    queue_start_addr_, kQueueSize, NULL,
+                                                    &queue_resource_)) {
+    return HSA_STATUS_ERROR_OUT_OF_RESOURCES;
+  }
+
+  cached_reserve_index_ = *reinterpret_cast<RingIndexTy*>(queue_resource_.Queue_write_ptr);
+  cached_commit_index_ = cached_reserve_index_;
+
+  engine_stuck_.store(false, std::memory_order_release);
+  stall_count_.store(0, std::memory_order_relaxed);
+  last_pending_probe_.store(0, std::memory_order_relaxed);
 
   return HSA_STATUS_SUCCESS;
 }

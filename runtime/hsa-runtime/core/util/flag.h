@@ -250,6 +250,24 @@ class Flag {
 
     var = os::GetEnvVar("HSA_WAIT_ANY_DEBUG");
     wait_any_ = (var == "1") ? true : false;
+
+    var = os::GetEnvVar("HSA_ENABLE_SDMA_HEALTH_PROBE");
+    enable_sdma_health_probe_ = (var == "1") ? true : false;
+
+    var = os::GetEnvVar("HSA_SDMA_HEALTH_PROBE_THRESHOLD");
+    sdma_health_probe_threshold_ = var.empty() ? 65536 : atoi(var.c_str());
+
+    var = os::GetEnvVar("HSA_SDMA_HEALTH_STALL_COUNT");
+    sdma_health_stall_count_ = var.empty() ? 3 : atoi(var.c_str());
+
+    var = os::GetEnvVar("HSA_DISABLE_SDMA_ROUNDROBIN");
+    disable_sdma_roundrobin_ = (var == "1") ? true : false;
+
+    var = os::GetEnvVar("HSA_SDMA_D2H_ENGINE_COUNT");
+    sdma_d2h_engine_count_ = var.empty() ? 0 : atoi(var.c_str());
+
+    var = os::GetEnvVar("HSA_VRAM_ALLOC_LIMIT_MB");
+    vram_alloc_limit_mb_ = var.empty() ? 0 : atoi(var.c_str());
   }
 
   void parse_masks(uint32_t maxGpu, uint32_t maxCU) {
@@ -362,6 +380,18 @@ class Flag {
 
   size_t pc_sampling_max_device_buffer_size() const { return pc_sampling_max_device_buffer_size_; }
 
+  bool enable_sdma_health_probe() const { return enable_sdma_health_probe_; }
+
+  size_t sdma_health_probe_threshold() const { return sdma_health_probe_threshold_; }
+
+  uint32_t sdma_health_stall_count() const { return sdma_health_stall_count_; }
+
+  bool disable_sdma_roundrobin() const { return disable_sdma_roundrobin_; }
+
+  uint32_t sdma_d2h_engine_count() const { return sdma_d2h_engine_count_; }
+
+  uint32_t vram_alloc_limit_mb() const { return vram_alloc_limit_mb_; }
+
  private:
   bool check_flat_scratch_;
   bool enable_vm_fault_message_;
@@ -391,6 +421,12 @@ class Flag {
   bool enable_mwaitx_;
   bool enable_ipc_mode_legacy_;
   bool wait_any_;
+  bool enable_sdma_health_probe_;
+  size_t sdma_health_probe_threshold_;
+  uint32_t sdma_health_stall_count_;
+  bool disable_sdma_roundrobin_;
+  uint32_t sdma_d2h_engine_count_;
+  uint32_t vram_alloc_limit_mb_;
 
   SDMA_OVERRIDE enable_sdma_;
   SDMA_OVERRIDE enable_peer_sdma_;

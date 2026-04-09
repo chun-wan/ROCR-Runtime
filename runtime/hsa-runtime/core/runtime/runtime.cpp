@@ -314,6 +314,25 @@ hsa_status_t Runtime::IterateAgent(hsa_status_t (*callback)(hsa_agent_t agent,
 hsa_status_t Runtime::AllocateMemory(const MemoryRegion* region, size_t size,
                                      MemoryRegion::AllocateFlags alloc_flags,
                                      void** address, int agent_node_id) {
+  // VRAM allocation guard: reject if GPU-wide free VRAM too low
+  uint32_t limit_mb = flag_.vram_alloc_limit_mb();
+  if (limit_mb > 0 && region != nullptr) {
+    auto* amd_region = static_cast<const AMD::MemoryRegion*>(region);
+    if (amd_region->IsLocalMemory()) {
+      size_t min_free = (size_t)limit_mb * 1024ULL * 1024ULL;
+      HSAuint64 available = 0;
+      if (hsaKmtAvailableMemory(amd_region->owner()->node_id(), &available)
+          == HSAKMT_STATUS_SUCCESS) {
+        if (available < size + min_free) {
+          fprintf(stderr,
+              "[ROCr] VRAM alloc blocked: available=%lluMB, request=%zuMB, min_free=%uMB\n",
+              (unsigned long long)(available >> 20), size >> 20, limit_mb);
+          return HSA_STATUS_ERROR_OUT_OF_RESOURCES;
+        }
+      }
+    }
+  }
+
   size_t size_requested = size;  // region->Allocate(...) may align-up size to granularity
   hsa_status_t status = region->Allocate(size, alloc_flags, address, agent_node_id);
   // Track the allocation result so that it could be freed properly.
@@ -2322,6 +2341,8 @@ void Runtime::LoadTools() {
     if (rocp_reg_status == ROCP_REG_SUCCESS && !allow_v1_registration) return;
   }
 #endif
+
+  if (flag().disable_tool_register()) return;
 
   std::vector<const char*> failed;
 

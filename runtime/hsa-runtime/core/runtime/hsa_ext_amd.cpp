@@ -1423,3 +1423,21 @@ hsa_status_t hsa_amd_enable_logging(uint8_t* flags, void *file) {
 
 }   //  namespace amd
 }   //  namespace rocr
+
+extern "C" __attribute__((visibility("default")))
+hsa_status_t hsa_amd_sdma_engine_is_stuck(hsa_agent_t agent_handle, bool* is_stuck) {
+  if (!is_stuck) return HSA_STATUS_ERROR_INVALID_ARGUMENT;
+  rocr::core::Agent* agent = rocr::core::Agent::Convert(agent_handle);
+  if (!agent) return HSA_STATUS_ERROR_INVALID_AGENT;
+  auto* gpu = static_cast<rocr::AMD::GpuAgent*>(agent);
+  *is_stuck = gpu->IsSdmaD2HStuck();
+  return HSA_STATUS_SUCCESS;
+}
+
+extern "C" __attribute__((visibility("default")))
+hsa_status_t hsa_amd_sdma_queue_reset(hsa_agent_t agent_handle) {
+  rocr::core::Agent* agent = rocr::core::Agent::Convert(agent_handle);
+  if (!agent) return HSA_STATUS_ERROR_INVALID_AGENT;
+  auto* gpu = static_cast<rocr::AMD::GpuAgent*>(agent);
+  return gpu->ResetSdmaD2HQueue();
+}

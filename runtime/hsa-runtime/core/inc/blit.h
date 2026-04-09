@@ -117,6 +117,15 @@ class Blit {
   /// must be exact.
   virtual uint64_t PendingBytes() = 0;
 
+  /// @brief Returns true if the SDMA engine appears stuck (PendingBytes not draining).
+  virtual bool IsStuck() const { return false; }
+
+  /// @brief Attempt to reset and reinitialize a stuck SDMA queue.
+  /// Only valid for SDMA blits. Returns HSA_STATUS_SUCCESS if reset succeeded.
+  virtual hsa_status_t ResetQueue(const core::Agent& agent) {
+    return HSA_STATUS_ERROR_INVALID_ARGUMENT;
+  }
+
   virtual void GangLeader(bool gang_leader) = 0;
   virtual bool GangLeader() const { return false; };
 };
